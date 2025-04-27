@@ -27,24 +27,18 @@ class WeatherAPIError(Exception):
 class CityNotFoundError(WeatherAPIError):
     """Raised when the specified city is not found by the API."""
 
-def _cache_get(endpoint: str, city: str) -> Optional[Dict[str, Any]]:
-    entry = _cache[endpoint].get(city.lower())
-    if entry and (time.time() - entry['timestamp'] < CACHE_TTL):
-        return entry['data']
-    return None
-
-def _cache_set(endpoint: str, city: str, data: Dict[str, Any]) -> None:
-    _cache[endpoint][city.lower()] = {'timestamp': time.time(), 'data': data}
-
 def fetch_current_weather(city: str) -> Optional[Dict[str, Any]]:
     """
     Fetch current weather for a given city using OpenWeatherMap.
     Returns a dict with temperature (C), weather condition, etc., or raises an exception on error.
     Caches results for CACHE_TTL seconds.
     """
-    cached = _cache_get('current', city)
-    if cached:
-        return cached
+    # Check cache
+    key = city.lower()
+    now = time.time()
+    entry = _cache['current'].get(key)
+    if entry and (now - entry['timestamp'] < CACHE_TTL):
+        return entry['data']
     params = {
         'q': city,
         'appid': API_KEY,
@@ -52,6 +46,8 @@ def fetch_current_weather(city: str) -> Optional[Dict[str, Any]]:
     }
     try:
         resp = requests.get(BASE_URL_CURRENT, params=params, timeout=5)
+        if resp.status_code == 404:
+            raise CityNotFoundError(f"City '{city}' not found")
         resp.raise_for_status()
         data = resp.json()
         result = {
@@ -61,11 +57,13 @@ def fetch_current_weather(city: str) -> Optional[Dict[str, Any]]:
             'humidity': data['main']['humidity'],
             'wind_speed': data['wind']['speed'],
         }
-        _cache_set('current', city, result)
+        # Cache result
+        _cache['current'][key] = {'timestamp': now, 'data': result}
         return result
+    except CityNotFoundError:
+        # Propagate city not found separately
+        raise
     except HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
-            raise CityNotFoundError(f"City '{city}' not found") from e
         raise WeatherAPIError(f"HTTP error fetching current weather for '{city}': {e}") from e
     except RequestException as e:
         raise WeatherAPIError(f"Request error fetching current weather for '{city}': {e}") from e
@@ -78,9 +76,12 @@ def fetch_forecast(city: str) -> Optional[Dict[str, Any]]:
     Returns a dict with a list of forecasts or raises an exception on error.
     Caches results for CACHE_TTL seconds.
     """
-    cached = _cache_get('forecast', city)
-    if cached:
-        return cached
+    # Check cache
+    key = city.lower()
+    now = time.time()
+    entry = _cache['forecast'].get(key)
+    if entry and (now - entry['timestamp'] < CACHE_TTL):
+        return entry['data']
     params = {
         'q': city,
         'appid': API_KEY,
@@ -88,6 +89,8 @@ def fetch_forecast(city: str) -> Optional[Dict[str, Any]]:
     }
     try:
         resp = requests.get(BASE_URL_FORECAST, params=params, timeout=5)
+        if resp.status_code == 404:
+            raise CityNotFoundError(f"City '{city}' not found")
         resp.raise_for_status()
         data = resp.json()
         forecasts = []
@@ -101,11 +104,13 @@ def fetch_forecast(city: str) -> Optional[Dict[str, Any]]:
             'city': data['city']['name'],
             'forecasts': forecasts
         }
-        _cache_set('forecast', city, result)
+        # Cache result
+        _cache['forecast'][key] = {'timestamp': now, 'data': result}
         return result
+    except CityNotFoundError:
+        # Propagate missing city
+        raise
     except HTTPError as e:
-        if e.response is not None and e.response.status_code == 404:
-            raise CityNotFoundError(f"City '{city}' not found") from e
         raise WeatherAPIError(f"HTTP error fetching forecast for '{city}': {e}") from e
     except RequestException as e:
         raise WeatherAPIError(f"Request error fetching forecast for '{city}': {e}") from e

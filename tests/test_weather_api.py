@@ -43,16 +43,18 @@ def test_fetch_current_weather_success(mocker):
 
 
 def test_fetch_current_weather_http_error(mocker):
-    """Test fetch_current_weather returns None on HTTP error status."""
+    """Test fetch_current_weather raises CityNotFoundError on 404."""
     mock_resp = DummyResponse({}, status_code=404)
     mocker.patch('weather_api.requests.get', return_value=mock_resp)
-    assert weather_api.fetch_current_weather('NoCity') is None
+    with pytest.raises(weather_api.CityNotFoundError):
+        weather_api.fetch_current_weather('NoCity')
 
 
 def test_fetch_current_weather_exception(mocker):
-    """Test fetch_current_weather returns None on exception."""
+    """Test fetch_current_weather raises WeatherAPIError on network exception."""
     mocker.patch('weather_api.requests.get', side_effect=Exception("Network"))
-    assert weather_api.fetch_current_weather('ErrorCity') is None
+    with pytest.raises(weather_api.WeatherAPIError):
+        weather_api.fetch_current_weather('ErrorCity')
 
 
 def test_fetch_current_weather_caching(mocker):
@@ -120,16 +122,18 @@ def test_fetch_forecast_success(mocker):
 
 
 def test_fetch_forecast_http_error(mocker):
-    """Test fetch_forecast returns None on HTTP error status."""
+    """Test fetch_forecast raises WeatherAPIError on HTTP error status."""
     mock_resp = DummyResponse({}, status_code=500)
     mocker.patch('weather_api.requests.get', return_value=mock_resp)
-    assert weather_api.fetch_forecast('BadCity') is None
+    with pytest.raises(weather_api.WeatherAPIError):
+        weather_api.fetch_forecast('BadCity')
 
 
 def test_fetch_forecast_exception(mocker):
-    """Test fetch_forecast returns None on exception."""
+    """Test fetch_forecast raises WeatherAPIError on exception."""
     mocker.patch('weather_api.requests.get', side_effect=Exception("API Down"))
-    assert weather_api.fetch_forecast('ErrorCity') is None
+    with pytest.raises(weather_api.WeatherAPIError):
+        weather_api.fetch_forecast('ErrorCity')
 
 
 def test_fetch_forecast_caching(mocker):
