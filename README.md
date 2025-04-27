@@ -29,5 +29,5 @@ A simple command-line weather application in Python.
    ```
 
 ## Notes
-- The app uses the [OpenWeatherMap](https://openweathermap.org/api) API (no key needed for basic usage).
+- The app uses the [OpenWeatherMap](https://openweathermap.org/api) API (requires API key).
 - If you want to use another API, update `weather_api.py` and add your API key if required.
